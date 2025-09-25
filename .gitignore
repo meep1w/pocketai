@@ -1,0 +1,15 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# ide
+.idea/
+.vscode/
+
+# runtime
+pocketai.db
+assets/*/*.jpg
+
+# secrets
+.env

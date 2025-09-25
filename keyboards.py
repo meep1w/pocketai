@@ -2,7 +2,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from texts import t
 from settings import settings
 
-SUPPORT_DEEPLINK = f"tg://user?id={settings.ADMIN_ID}"
+SUPPORT_DEEPLINK = settings.SUPPORT_URL or f"tg://user?id={settings.PRIMARY_ADMIN}"
 
 def kb_main(lang: str, is_platinum: bool, can_open: bool) -> InlineKeyboardMarkup:
     rows = [

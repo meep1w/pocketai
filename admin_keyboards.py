@@ -79,7 +79,7 @@ def kb_params(sub_on: bool, dep_on: bool, reg_on: bool) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton(
-                text=('🔓 ' if not reg_on else '🔒 ') + 'Регистрация',
+                text=('🔒 ' if reg_on else '🔓 ') + 'Регистрация',
                 callback_data='adm:param:toggle:reg'
             ),
             InlineKeyboardButton(text='💵 Мин. деп', callback_data='adm:param:set:firstdep'),

@@ -22,8 +22,9 @@ from config_service import (
 
 router = Router(name="admin")
 
-def is_admin(user_id:int) -> bool:
-    return user_id == settings.ADMIN_ID
+def is_admin(user_id: int) -> bool:
+    ids = getattr(settings, "ADMIN_IDS", []) or [settings.ADMIN_ID]
+    return user_id in ids
 
 @router.message(Command("admin"))
 async def cmd_admin(m: Message):
@@ -269,17 +270,22 @@ class NumberState(StatesGroup):
 
 @router.callback_query(F.data.startswith("adm:param:toggle:"))
 async def cb_param_toggle(c: CallbackQuery):
-    if not is_admin(c.from_user.id): return
+    if not is_admin(c.from_user.id):
+        return
     key = c.data.split(":")[-1]
-    map_keys = {"sub": "CHECK_SUBSCRIPTION", "reg":"CHECK_REGISTRATION", "dep":"CHECK_DEPOSIT"}
+    map_keys = {"sub": "CHECK_SUBSCRIPTION", "reg": "CHECK_REGISTRATION", "dep": "CHECK_DEPOSIT"}
     cur = await get_value(map_keys[key], "1")
-    new = not (str(cur).lower() in {"1","true","yes","on"})
+    new = not (str(cur).lower() in {"1", "true", "yes", "on"})
     await set_bool(map_keys[key], new)
-    await cb_params(c)
+    await cb_params(c)  # перерисуем экран
+
+
+
 
 @router.callback_query(F.data == "adm:params")
 async def cb_params(c: CallbackQuery):
-    if not is_admin(c.from_user.id): return
+    if not is_admin(c.from_user.id):
+        return
     fdep = await first_deposit_min()
     plat = await platinum_threshold()
     sub_on = await check_subscription_enabled()
@@ -294,6 +300,7 @@ async def cb_params(c: CallbackQuery):
     )
     await c.message.edit_text(text, reply_markup=kb_params(sub_on, dep_on, reg_on), parse_mode='HTML')
     await c.answer()
+
 
 
 @router.callback_query(F.data.startswith("adm:param:set:"))
