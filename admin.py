@@ -32,6 +32,20 @@ router = Router(name="admin")
 
 
 # --- helpers
+
+async def _render_content_screen(c: CallbackQuery, lang: str, screen: str):
+    title_key, text_key = SCREEN_MAP.get(screen, ('main_title', 'main_desc'))
+    async with get_session() as session:
+        res = await session.execute(select(ContentOverride).where(
+            ContentOverride.lang == lang, ContentOverride.screen == screen
+        ))
+        ov = res.scalar_one_or_none()
+    title = ov.title if ov and ov.title else title_key
+    text = ov.text if ov and ov.text else text_key
+    msg = (f"🧩 Контент — <b>{screen}</b> [{lang.upper()}]\n\n"
+           f"<b>Заголовок:</b> <code>{h(title)}</code>\n<b>Текст:</b>\n<code>{h(text)[:900]}</code>")
+    await c.message.edit_text(msg, reply_markup=kb_content_editor(lang, screen), parse_mode='HTML')
+
 def is_admin(user_id: int) -> bool:
     ids = getattr(settings, "ADMIN_IDS", []) or [settings.ADMIN_ID]
     return user_id in ids
@@ -310,21 +324,41 @@ async def cb_content_screen(c: CallbackQuery):
     if not is_admin(c.from_user.id):
         return
     _, _, _, lang, screen = c.data.split(":")
-    title_key, text_key = SCREEN_MAP.get(screen, ('main_title', 'main_desc'))
+    await _render_content_screen(c, lang, screen)
+    await c.answer()
 
+@router.callback_query(F.data.startswith("adm:content:reset_text:"))
+async def cb_content_reset_text(c: CallbackQuery):
+    if not is_admin(c.from_user.id):
+        return
+    _, _, _, lang, screen = c.data.split(":")
     async with get_session() as session:
         res = await session.execute(select(ContentOverride).where(
             ContentOverride.lang == lang, ContentOverride.screen == screen
         ))
         ov = res.scalar_one_or_none()
+        if ov:
+            await session.delete(ov)
+            await session.commit()
+    await _render_content_screen(c, lang, screen)
+    await c.answer("Текст сброшен к дефолту.", show_alert=False)
 
-    title = ov.title if ov and ov.title else title_key
-    text = ov.text if ov and ov.text else text_key
-
-    msg = (f"🧩 Контент — <b>{screen}</b> [{lang.upper()}]\n\n"
-           f"<b>Заголовок:</b> <code>{h(title)}</code>\n<b>Текст:</b>\n<code>{h(text)[:900]}</code>")
-    await c.message.edit_text(msg, reply_markup=kb_content_editor(lang, screen), parse_mode='HTML')
-    await c.answer()
+@router.callback_query(F.data.startswith("adm:content:reset_photo:"))
+async def cb_content_reset_photo(c: CallbackQuery):
+    if not is_admin(c.from_user.id):
+        return
+    _, _, _, lang, screen = c.data.split(":")
+    p = Path("assets") / ("ru" if lang == "ru" else "en") / f"{screen}.jpg"
+    if p.exists():
+        try:
+            p.unlink()
+            note = "Картинка удалена (будет показан дефолт, если он есть)."
+        except Exception as e:
+            note = f"Не удалось удалить файл: {e}"
+    else:
+        note = "Файл картинки не найден — уже дефолт."
+    await _render_content_screen(c, lang, screen)
+    await c.answer(note, show_alert=False)
 
 
 class ContentEditState(StatesGroup):

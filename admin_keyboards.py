@@ -102,9 +102,12 @@ def kb_content_editor(lang: str, screen: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='📝 Изменить текст', callback_data=f'adm:content:edit_text:{lang}:{screen}')],
         [InlineKeyboardButton(text='🖼️ Изменить картинку', callback_data=f'adm:content:edit_photo:{lang}:{screen}')],
+        [InlineKeyboardButton(text='↩️ Сбросить текст', callback_data=f'adm:content:reset_text:{lang}:{screen}')],
+        [InlineKeyboardButton(text='🗑️ Удалить картинку (сброс)', callback_data=f'adm:content:reset_photo:{lang}:{screen}')],
         [InlineKeyboardButton(text='⬅️ Назад', callback_data=f'adm:content:lang:{lang}')],
         [InlineKeyboardButton(text='🏠 В меню', callback_data='adm:menu')],
     ])
+
 
 # -------- Параметры --------
 def kb_params(sub_on: bool, dep_on: bool) -> InlineKeyboardMarkup:
@@ -151,3 +154,5 @@ def kb_number_back(back_cb: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='↩️ Отмена', callback_data=back_cb)]
     ])
+
+
