@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+DEFAULT_LANG = os.getenv('DEFAULT_LANG', 'en')
 
 @dataclass
 class Settings:
