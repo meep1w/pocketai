@@ -236,12 +236,16 @@ async def cb_instructions(c: CallbackQuery, bot: Bot):
 async def cb_lang(c: CallbackQuery, bot: Bot):
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
+        lang = user.language or 'en'  # дефолт EN
         await send_screen(
-            bot, user, key='main',
-            title_key='lang_title', text_key='lang_title',
-            markup=kb_lang(user_lang(user))
+            bot, user,
+            key='main',                 # можно оставить 'main' чтобы картинка была как в меню
+            title_key='lang_title',
+            text_key='lang_title',
+            markup=kb_lang(lang)        # <-- передаём текущий язык
         )
-        await c.answer()
+    await c.answer()
+
 
 
 @router.callback_query(F.data.startswith('setlang:'))

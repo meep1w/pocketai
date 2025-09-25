@@ -7,11 +7,6 @@ SUPPORT_DEEPLINK = settings.SUPPORT_URL or f"tg://user?id={settings.PRIMARY_ADMI
 
 
 def kb_main(lang: str, is_platinum: bool, can_open: bool) -> InlineKeyboardMarkup:
-    """
-    Ряд 1:  📘 Инструкция
-    Ряд 2:  🆘 Поддержка | 🌐 Сменить язык
-    Ряд 3:  🚀 Получить сигнал  (или открыть мини-апп, если доступ уже открыт)
-    """
     rows = [
         [InlineKeyboardButton(text=t(lang, "btn_instruction"), callback_data="instructions")],
         [
@@ -19,15 +14,14 @@ def kb_main(lang: str, is_platinum: bool, can_open: bool) -> InlineKeyboardMarku
             InlineKeyboardButton(text=t(lang, "btn_change_lang"), callback_data="lang"),
         ],
     ]
-
     if can_open:
         url = settings.MINI_APP_PLATINUM if is_platinum else settings.MINI_APP
         label = t(lang, "btn_open_vip_miniapp") if is_platinum else t(lang, "btn_open_miniapp")
         rows.append([InlineKeyboardButton(text=label, web_app=WebAppInfo(url=url))])
     else:
         rows.append([InlineKeyboardButton(text=t(lang, "btn_get_signal"), callback_data="get_signal")])
-
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
 
 
 def kb_instruction(lang: str) -> InlineKeyboardMarkup:
@@ -41,10 +35,7 @@ def kb_instruction(lang: str) -> InlineKeyboardMarkup:
     ])
 
 
-def kb_lang() -> InlineKeyboardMarkup:
-    """
-    Две строки по два языка с флагами + «В меню».
-    """
+def kb_lang(current_lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="🇷🇺 Русский",  callback_data="setlang:ru"),
@@ -54,8 +45,9 @@ def kb_lang() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🇮🇳 हिन्दी",   callback_data="setlang:hi"),
             InlineKeyboardButton(text="🇪🇸 Español", callback_data="setlang:es"),
         ],
-        [InlineKeyboardButton(text="↩️ В меню", callback_data="menu")],
+        [InlineKeyboardButton(text=t(current_lang, "btn_menu"), callback_data="menu")],
     ])
+
 
 
 def kb_subscribe(lang: str) -> InlineKeyboardMarkup:
