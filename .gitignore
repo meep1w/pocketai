@@ -1,15 +1,8 @@
-# python
+.env
+pocketai.db
+/pocketai.db
+.venv/
 __pycache__/
 *.pyc
-.venv/
-
-# ide
 .idea/
 .vscode/
-
-# runtime
-pocketai.db
-assets/*/*.jpg
-
-# secrets
-.env

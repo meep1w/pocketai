@@ -192,7 +192,7 @@ async def cmd_start(m: Message, bot: Bot):
         # первый /start — окно выбора языка
         if not user.language:
             await send_screen(
-                bot, user, key='main',
+                bot, user, key='langs',
                 title_key='lang_title', text_key='lang_title',
                 markup=kb_lang(user_lang(user))
             )
@@ -200,7 +200,7 @@ async def cmd_start(m: Message, bot: Bot):
         # все следующие — главное меню
         can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
         await send_screen(
-            bot, user, key='langs',
+            bot, user, key='main',
             title_key='main_title', text_key='main_desc',
             markup=kb_main(user_lang(user), user.is_platinum, can_open)
         )
