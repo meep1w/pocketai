@@ -310,7 +310,7 @@ async def cb_setlang(c: CallbackQuery, bot: Bot):
         user.language = lang
         await session.commit()
 
-        can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
+        can_open = await has_access_now(user)
         await send_screen(
             bot, user, key="main",
             title_key="main_title", text_key="main_desc",
