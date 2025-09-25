@@ -200,7 +200,7 @@ async def cmd_start(m: Message, bot: Bot):
         # все следующие — главное меню
         can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
         await send_screen(
-            bot, user, key='main',
+            bot, user, key='langs',
             title_key='main_title', text_key='main_desc',
             markup=kb_main(user_lang(user), user.is_platinum, can_open)
         )
@@ -259,7 +259,7 @@ async def cb_setlang(c: CallbackQuery, bot: Bot):
         await session.commit()
         can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
         await send_screen(
-            bot, user, key='main',
+            bot, user, key='langs',
             title_key='main_title', text_key='main_desc',
             markup=kb_main(user_lang(user), user.is_platinum, can_open)
         )
