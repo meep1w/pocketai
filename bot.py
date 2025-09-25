@@ -53,12 +53,15 @@ async def make_sig(kind: str, click_id: str) -> str:
 
 def photo_path(lang: Optional[str], key: str) -> Optional[Path]:
     subdir = 'ru' if (lang == 'ru') else 'en'
-    # сначала ищем пользовательскую (assets_custom), потом дефолтную (assets)
-    p_custom = ASSETS.parent / 'assets_custom' / subdir / f"{key}.jpg"
-    if p_custom.exists():
-        return p_custom
-    p = ASSETS / subdir / f"{key}.jpg"
-    return p if p.exists() else None
+    for base in (ASSETS.parent / 'assets_custom', ASSETS):
+        p = base / subdir / f"{key}.jpg"
+        try:
+            if p.exists() and p.stat().st_size > 0:
+                return p
+        except Exception:
+            pass
+    return None
+
 
 
 
@@ -93,12 +96,21 @@ async def send_screen(bot: Bot, user: User, key: str, title_key: str, text_key: 
             body = ov.text or body
 
         caption = f"<b>{title}</b>\n\n{body}"
-        if img is not None:
-            msg = await bot.send_photo(
-                chat_id=db_user.telegram_id, photo=FSInputFile(img),
-                caption=caption, parse_mode="HTML", reply_markup=markup
-            )
-        else:
+        use_photo = (img is not None) and (len(caption) <= 1024)
+
+        try:
+            if use_photo:
+                msg = await bot.send_photo(
+                    chat_id=db_user.telegram_id, photo=FSInputFile(img),
+                    caption=caption, parse_mode="HTML", reply_markup=markup
+                )
+            else:
+                msg = await bot.send_message(
+                    chat_id=db_user.telegram_id, text=caption,
+                    parse_mode="HTML", reply_markup=markup
+                )
+        except Exception:
+            # на всякий случай фолбэк в текст
             msg = await bot.send_message(
                 chat_id=db_user.telegram_id, text=caption,
                 parse_mode="HTML", reply_markup=markup
@@ -107,6 +119,59 @@ async def send_screen(bot: Bot, user: User, key: str, title_key: str, text_key: 
         db_user.last_bot_message_id = msg.message_id
         await session.commit()
 
+async def send_deposit_progress(bot: Bot, user: User) -> None:
+    """Экран депозита + динамический прогресс (нужная сумма / внесено / осталось)."""
+    async with get_session() as session:
+        u = await session.get(User, user.id)
+        await delete_previous(bot, u.telegram_id, u)
+
+        lang = u.language or DEFAULT_LANG
+        # картинка и базовые тексты (с оверрайдом из БД, если есть)
+        p = photo_path(lang, "deposit")
+        title = t(lang, "deposit_title")
+        body  = t(lang, "deposit_text")
+
+        ov = None
+        res = await session.execute(
+            select(ContentOverride).where(ContentOverride.lang == lang, ContentOverride.screen == "deposit")
+        )
+        ov = res.scalar_one_or_none()
+        if ov:
+            title = ov.title or title
+            body  = ov.text  or body
+
+        # прогресс
+        need = await first_deposit_min()
+        paid = float(u.total_deposits or 0.0)
+        left = max(0.0, need - paid)
+
+        extra = (
+            f"\n\n"
+            f"<b>{t(lang,'deposit_need')}:</b> ${need:,.2f}\n"
+            f"<b>{t(lang,'deposit_paid')}:</b> ${paid:,.2f}\n"
+            f"<b>{t(lang,'deposit_left')}:</b> ${left:,.2f}"
+        )
+
+        # кнопка
+        u = await ensure_click_id(session, u)
+        dep_url = f"{settings.PUBLIC_BASE.rstrip('/')}/d/{u.click_id}/{await make_sig('dep', u.click_id)}"
+        markup = kb_deposit(lang, dep_url)
+
+        # отправка
+        caption = f"<b>{title}</b>\n\n{body}{extra}"
+        use_photo = (p is not None) and (len(caption) <= 1024)
+
+        try:
+            if use_photo:
+                msg = await bot.send_photo(u.telegram_id, FSInputFile(p),
+                                           caption=caption, parse_mode="HTML", reply_markup=markup)
+            else:
+                msg = await bot.send_message(u.telegram_id, caption, parse_mode="HTML", reply_markup=markup)
+        except Exception:
+            msg = await bot.send_message(u.telegram_id, caption, parse_mode="HTML", reply_markup=markup)
+
+        u.last_bot_message_id = msg.message_id
+        await session.commit()
 
 async def check_subscription(bot: Bot, tg_id: int) -> bool:
     try:
@@ -158,11 +223,7 @@ async def evaluate_and_route(bot: Bot, user: User) -> None:
             if not u.has_deposit:
                 u = await ensure_click_id(session, u)
                 dep_url = f"{settings.PUBLIC_BASE.rstrip('/')}/d/{u.click_id}/{await make_sig('dep', u.click_id)}"
-                await send_screen(
-                    bot, u, key="deposit",
-                    title_key="deposit_title", text_key="deposit_text",
-                    markup=kb_deposit(user_lang(u), dep_url)
-                )
+                await send_deposit_progress(bot, u)
                 return
 
         # Platinum (защита от расхождений с постбэком)
