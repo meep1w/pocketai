@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, func
-
+from html import escape as h
 from settings import settings
 from db import get_session, User, ContentOverride
 from admin_keyboards import kb_admin_menu, kb_users_list, kb_user_card, kb_links_menu, kb_content_lang, kb_content_screens, kb_params, kb_broadcast, kb_content_editor, kb_number_back
@@ -100,23 +100,38 @@ async def cb_user_card(c: CallbackQuery):
 
 @router.callback_query(F.data == "adm:postbacks")
 async def cb_postbacks(c: CallbackQuery):
-    if not is_admin(c.from_user.id): return
-    base = await get_value("PUBLIC_BASE", None) or ""
+    if not is_admin(c.from_user.id):
+        return
+
     secret = await pb_secret()
-    host = base.split('://')[-1].rstrip('/') if base else "YOUR_PUBLIC_HOST"
-    text=(
+    base = (settings.PUBLIC_BASE or "").rstrip("/") or "https://YOUR_PUBLIC_HOST"
+
+    reg = f"{base}/pb?event=reg&t={secret}&click_id={{click_id}}&trader_id={{trader_id}}"
+    dep_first = f"{base}/pb?event=dep_first&t={secret}&click_id={{click_id}}&trader_id={{trader_id}}&sumdep={{sumdep}}"
+    dep_repeat = f"{base}/pb?event=dep_repeat&t={secret}&click_id={{click_id}}&trader_id={{trader_id}}&sumdep={{sumdep}}"
+
+    text = (
         "✏️ <b>Настройка постбэков</b>\n\n"
         "Вставьте эти URL в кабинете партнёрки (PocketPartners).\n"
         "Обязательно включите макросы: <code>{click_id}</code>, <code>{trader_id}</code>, <code>{sumdep}</code>.\n\n"
         "<b>Регистрация</b>\n"
-        f"https://{host}/pb?event=reg&t={secret}&click_id={{click_id}}&trader_id={{trader_id}}\n\n"
+        f"<code>{h(reg)}</code>\n\n"
         "<b>Первый депозит</b>\n"
-        f"https://{host}/pb?event=dep_first&t={secret}&click_id={{click_id}}&trader_id={{trader_id}}&sumdep={{sumdep}}\n\n"
+        f"<code>{h(dep_first)}</code>\n\n"
         "<b>Повторный депозит</b>\n"
-        f"https://{host}/pb?event=dep_repeat&t={secret}&click_id={{click_id}}&trader_id={{trader_id}}&sumdep={{sumdep}}\n\n"
-        "• click_id → click_id\n• trader_id → trader_id\n• sumdep → sumdep"
+        f"<code>{h(dep_repeat)}</code>\n\n"
+        "• <code>click_id</code> → <i>click_id</i>\n"
+        "• <code>trader_id</code> → <i>trader_id</i>\n"
+        "• <code>sumdep</code> → <i>sumdep</i>"
     )
-    await c.message.edit_text(text, reply_markup=kb_admin_menu(), parse_mode='HTML'); await c.answer()
+
+    await c.message.edit_text(
+        text,
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+        reply_markup=kb_admin_menu()
+    )
+    await c.answer()
 
 class EditState(StatesGroup):
     waiting_value = State()
