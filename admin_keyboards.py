@@ -65,8 +65,8 @@ def kb_links_menu() -> InlineKeyboardMarkup:
     В админке показываем ТОЛЬКО A-ссылки. B нигде не светим.
     """
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить реф-ссылку (REG_A)', callback_data='adm:links:edit:REF_REG_A')],
-        [InlineKeyboardButton(text='Изменить ссылку депоз. (DEP_A)', callback_data='adm:links:edit:REF_DEP_A')],
+        [InlineKeyboardButton(text='Изменить реф-ссылку', callback_data='adm:links:edit:REF_REG_A')],
+        [InlineKeyboardButton(text='Изменить ссылку депозита', callback_data='adm:links:edit:REF_DEP_A')],
         [InlineKeyboardButton(text='Изменить канал (ID)', callback_data='adm:links:edit:CHANNEL_ID')],
         [InlineKeyboardButton(text='Изменить Channel URL', callback_data='adm:links:edit:CHANNEL_URL')],
         [InlineKeyboardButton(text='Изменить Support URL', callback_data='adm:links:edit:SUPPORT_URL')],

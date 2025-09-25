@@ -214,10 +214,26 @@ class EditState(StatesGroup):
 async def cb_links(c: CallbackQuery, state: FSMContext):
     if not is_admin(c.from_user.id):
         return
-    text = await _links_text()
+
+    # читаем СЫРЫЕ значения из config, без подстановок из .env
+    refreg = await get_value("REF_REG_A", "") or "-"
+    refdep = await get_value("REF_DEP_A", "") or "-"
+    ch_id  = await get_value("CHANNEL_ID", "") or "-"
+    ch_url = await get_value("CHANNEL_URL", "") or "-"
+    sup    = await get_value("SUPPORT_URL", "") or "-"
+
+    text = (
+        "🔗 <b>Ссылки</b>\n\n"
+        f"Ref:\n<code>{refreg}</code>\n\n"
+        f"Deposit:\n<code>{refdep}</code>\n\n"
+        f"Channel ID: <code>{ch_id}</code>\n"
+        f"Channel URL: {ch_url}\n"
+        f"Support URL: {sup}\n"
+    )
     await c.message.edit_text(text, reply_markup=kb_links_menu(), parse_mode='HTML')
     await c.answer()
     await state.clear()
+
 
 @router.callback_query(F.data.startswith("adm:links:edit:"))
 async def cb_links_edit(c: CallbackQuery, state: FSMContext):
