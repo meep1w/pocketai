@@ -24,8 +24,7 @@ from keyboards import (
 )
 from admin import router as admin_router
 from config_service import (
-    pb_secret, channel_id,
-    first_deposit_min, platinum_threshold,
+    pb_secret, channel_id, platinum_threshold,
     check_subscription_enabled, check_registration_enabled, check_deposit_enabled
 )
 
@@ -51,25 +50,29 @@ async def make_sig(kind: str, click_id: str) -> str:
 
 
 def photo_path(lang: Optional[str], key: str) -> Optional[Path]:
-    # если языка нет или он не 'ru' — берём EN
+    # если язык не ru — используем EN
     subdir = 'ru' if (lang == 'ru') else 'en'
     p = ASSETS / subdir / f"{key}.jpg"
     return p if p.exists() else None
 
 
+async def try_delete_message(bot: Bot, chat_id: int, message_id: int) -> None:
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except Exception:
+        pass
+
+
 async def delete_previous(bot: Bot, chat_id: int, user: User) -> None:
     if user.last_bot_message_id:
-        try:
-            await bot.delete_message(chat_id, user.last_bot_message_id)
-        except Exception:
-            pass
+        await try_delete_message(bot, chat_id, user.last_bot_message_id)
 
 
 async def send_screen(bot: Bot, user: User, key: str, title_key: str, text_key: str, markup) -> None:
     async with get_session() as session:
         db_user = await session.get(User, user.id)
 
-        # убираем прошлое сообщение-экран
+        # убираем прошлую карточку (по сохранённому id)
         await delete_previous(bot, db_user.telegram_id, db_user)
 
         lang = user_lang(db_user)
@@ -77,7 +80,7 @@ async def send_screen(bot: Bot, user: User, key: str, title_key: str, text_key: 
         # картинка
         p = photo_path(lang, key)
 
-        # тексты (с учётом возможных оверрайдов из админки)
+        # тексты (+ возможные оверрайды из админки)
         title = t(lang, title_key)
         body = t(lang, text_key)
         async with get_session() as s2:
@@ -138,7 +141,7 @@ async def evaluate_and_route(bot: Bot, user: User) -> None:
                 await send_screen(
                     bot, u, key='subscribe',
                     title_key='subscribe_title', text_key='subscribe_text',
-                    markup=kb_subscribe(user_lang(u))  # есть кнопка "Я подписался"
+                    markup=kb_subscribe(user_lang(u))  # есть "Я подписался"
                 )
                 return
 
@@ -172,13 +175,13 @@ async def evaluate_and_route(bot: Bot, user: User) -> None:
                 )
                 return
 
-        # Платина (дублирующее вычисление; основной флаг приходит из постбэков)
+        # Платина (подстраховка; основной флаг приходит из постбэков)
         th = await platinum_threshold()
         if (not u.is_platinum) and (u.total_deposits >= th):
             u.is_platinum = True
             await session.commit()
 
-        # Доступ открыт — пушим один раз
+        # Доступ открыт — один раз
         if not u.access_notified:
             u.access_notified = True
             await session.commit()
@@ -199,16 +202,16 @@ async def cmd_start(m: Message, bot: Bot):
     async with get_session() as session:
         user = await get_or_create_user(session, m.from_user.id)
 
-        # Первый запуск — выбор языка
+        # первый запуск — экран языков (картинка langs.jpg)
         if not user.language:
             await send_screen(
                 bot, user, key='langs',
                 title_key='lang_title', text_key='lang_title',
-                markup=kb_lang()           # 2x2 с флагами
+                markup=kb_lang()
             )
             return
 
-        # Иначе — главное меню
+        # дальше — главное меню в выбранном языке
         can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
         await send_screen(
             bot, user, key='main',
@@ -219,6 +222,8 @@ async def cmd_start(m: Message, bot: Bot):
 
 @router.callback_query(F.data == 'menu')
 async def cb_menu_user(c: CallbackQuery, bot: Bot):
+    # удаляем текущую карточку для 100% чистоты
+    await try_delete_message(bot, c.message.chat.id, c.message.message_id)
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
         can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
@@ -232,18 +237,21 @@ async def cb_menu_user(c: CallbackQuery, bot: Bot):
 
 @router.callback_query(F.data == 'instructions')
 async def cb_instructions(c: CallbackQuery, bot: Bot):
+    await try_delete_message(bot, c.message.chat.id, c.message.message_id)
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
         await send_screen(
             bot, user, key='instruction',
             title_key='instruction_title', text_key='instruction_text',
-            markup=kb_instruction(user_lang(user))  # кнопка "📝 Зарегистрироваться" -> callback
+            markup=kb_instruction(user_lang(user))
         )
     await c.answer()
 
 
 @router.callback_query(F.data == 'lang')
 async def cb_lang(c: CallbackQuery, bot: Bot):
+    # именно картинка langs.jpg
+    await try_delete_message(bot, c.message.chat.id, c.message.message_id)
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
         await send_screen(
@@ -259,6 +267,7 @@ async def cb_setlang(c: CallbackQuery, bot: Bot):
     lang = c.data.split(':', 1)[1]
     if lang not in {'ru', 'en', 'hi', 'es'}:
         lang = DEFAULT_LANG
+    await try_delete_message(bot, c.message.chat.id, c.message.message_id)
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
         user.language = lang
@@ -274,6 +283,7 @@ async def cb_setlang(c: CallbackQuery, bot: Bot):
 
 @router.callback_query(F.data == 'get_signal')
 async def cb_get_signal(c: CallbackQuery, bot: Bot):
+    await try_delete_message(bot, c.message.chat.id, c.message.message_id)
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
     await evaluate_and_route(bot, user)
@@ -283,6 +293,7 @@ async def cb_get_signal(c: CallbackQuery, bot: Bot):
 # --- «Я подписался» ---
 @router.callback_query(F.data == 'check_sub')
 async def on_check_subscription(c: CallbackQuery):
+    # удалять карточку тут не нужно; она перерисуется далее
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
         lang = user_lang(user)
@@ -301,6 +312,7 @@ async def on_check_subscription(c: CallbackQuery):
 # --- «Зарегистрироваться» из инструкции (callback) ---
 @router.callback_query(F.data == 'btn_register')
 async def on_btn_register(c: CallbackQuery, bot: Bot):
+    await try_delete_message(bot, c.message.chat.id, c.message.message_id)
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
         lang = user_lang(user)
@@ -326,21 +338,21 @@ async def on_btn_register(c: CallbackQuery, bot: Bot):
 async def cmd_whoami(m: Message):
     async with get_session() as session:
         res = await session.execute(select(User).where(User.telegram_id == m.from_user.id))
-        user = res.scalar_one_or_none()
-        if not user:
+        u = res.scalar_one_or_none()
+        if not u:
             await m.answer("no user in db yet")
             return
         await m.answer(
-            f"tg_id: {user.telegram_id}\n"
-            f"group: {user.group_ab}\n"
-            f"lang: {user.language}\n"
-            f"subscribed: {user.is_subscribed}\n"
-            f"registered: {user.is_registered}\n"
-            f"has_deposit: {user.has_deposit}\n"
-            f"total_deposits: {user.total_deposits}\n"
-            f"platinum: {user.is_platinum}\n"
-            f"click_id: {user.click_id}\n"
-            f"trader_id: {user.trader_id}"
+            f"tg_id: {u.telegram_id}\n"
+            f"group: {u.group_ab}\n"
+            f"lang: {u.language}\n"
+            f"subscribed: {u.is_subscribed}\n"
+            f"registered: {u.is_registered}\n"
+            f"has_deposit: {u.has_deposit}\n"
+            f"total_deposits: {u.total_deposits}\n"
+            f"platinum: {u.is_platinum}\n"
+            f"click_id: {u.click_id}\n"
+            f"trader_id: {u.trader_id}"
         )
 
 
