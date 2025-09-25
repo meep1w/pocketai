@@ -33,6 +33,15 @@ DEFAULT_LANG = "en"
 
 
 # ----------------- helpers -----------------
+async def has_access_now(u: User) -> bool:
+    sub_on = await check_subscription_enabled()
+    reg_on = await check_registration_enabled()
+    dep_on = await check_deposit_enabled()
+    ok_sub = (not sub_on) or u.is_subscribed
+    ok_reg = (not reg_on) or u.is_registered
+    ok_dep = (not dep_on) or u.has_deposit
+    return ok_sub and ok_reg and ok_dep
+
 def user_lang(user: User) -> str:
     return user.language or DEFAULT_LANG
 
@@ -177,36 +186,28 @@ router = Router()
 async def cmd_start(m: Message, bot: Bot):
     async with get_session() as session:
         user = await get_or_create_user(session, m.from_user.id)
-
-        # первый старт — выбор языка (langs.jpg)
         if not user.language:
-            await send_screen(
-                bot, user, key="langs",
-                title_key="lang_title", text_key="lang_title",
-                markup=kb_lang(user_lang(user))
-            )
+            await send_screen(bot, user, key='langs',
+                              title_key='lang_title', text_key='lang_title',
+                              markup=kb_lang(user_lang(user)))
             return
-
-        # дальше — главное меню
-        can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
-        await send_screen(
-            bot, user, key="main",
-            title_key="main_title", text_key="main_desc",
-            markup=kb_main(user_lang(user), user.is_platinum, can_open)
-        )
+        can_open = await has_access_now(user)
+        await send_screen(bot, user, key='main',
+                          title_key='main_title', text_key='main_desc',
+                          markup=kb_main(user_lang(user), user.is_platinum, can_open))
 
 
-@router.callback_query(F.data == "menu")
+
+@router.callback_query(F.data == 'menu')
 async def cb_menu_user(c: CallbackQuery, bot: Bot):
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
-        can_open = (user.is_subscribed and user.is_registered and user.has_deposit)
-        await send_screen(
-            bot, user, key="main",
-            title_key="main_title", text_key="main_desc",
-            markup=kb_main(user_lang(user), user.is_platinum, can_open)
-        )
+        can_open = await has_access_now(user)
+        await send_screen(bot, user, key='main',
+                          title_key='main_title', text_key='main_desc',
+                          markup=kb_main(user_lang(user), user.is_platinum, can_open))
     await c.answer()
+
 
 
 @router.callback_query(F.data == "instructions")
@@ -252,12 +253,20 @@ async def cb_setlang(c: CallbackQuery, bot: Bot):
     await c.answer()
 
 
-@router.callback_query(F.data == "get_signal")
+@router.callback_query(F.data == 'get_signal')
 async def cb_get_signal(c: CallbackQuery, bot: Bot):
     async with get_session() as session:
         user = await get_or_create_user(session, c.from_user.id)
-    await evaluate_and_route(bot, user)
+        if await has_access_now(user):
+            await send_screen(
+                bot, user, key='access',
+                title_key='access_title', text_key='access_text',
+                markup=kb_access(user_lang(user), vip=user.is_platinum)
+            )
+        else:
+            await evaluate_and_route(bot, user)
     await c.answer()
+
 
 
 # «Я подписался» на шаге подписки
