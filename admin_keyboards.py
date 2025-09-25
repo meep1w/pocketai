@@ -1,4 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from typing import Iterable, Tuple, List
 
 # -------- Меню --------
 def kb_admin_menu() -> InlineKeyboardMarkup:
@@ -18,16 +19,21 @@ def kb_back_menu() -> InlineKeyboardMarkup:
     ])
 
 # -------- Пользователи --------
-def kb_users_list(items, page: int, has_prev: bool, has_next: bool) -> InlineKeyboardMarkup:
+def kb_users_list(
+    items: Iterable[Tuple[int, str]],
+    page: int,
+    has_prev: bool,
+    has_next: bool
+) -> InlineKeyboardMarkup:
     """
     items: Iterable[Tuple[int, str]]  # (tg_id, подпись)
     ВНИМАНИЕ: сюда уже передаём список БЕЗ пользователей группы B
     """
-    rows = []
+    rows: List[List[InlineKeyboardButton]] = []
     for tg_id, label in items:
         rows.append([InlineKeyboardButton(text=label, callback_data=f'adm:user:{tg_id}')])
 
-    nav = []
+    nav: List[InlineKeyboardButton] = []
     if has_prev:
         nav.append(InlineKeyboardButton(text='◀️', callback_data=f'adm:users:{page-1}'))
     if has_next:

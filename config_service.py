@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Optional
-from sqlalchemy import select
+from typing import Optional,Dict, Tuple
+from sqlalchemy import select, delete
 
-from db import get_session, Config
+from db import get_session, Config, BtnOverride
 from settings import settings
 
+# in-memory кэш: {(lang, key): text}
+BTN_CACHE: Dict[Tuple[str, str], str] = {}
 
 # ========= базовые helpers =========
 
@@ -135,3 +137,36 @@ async def set_bcast_text(v: str) -> None:
 
 async def set_bcast_photo(v: str) -> None:
     await set_value("BCAST_PHOTO", v)
+
+
+async def load_button_overrides() -> None:
+    async with get_session() as s:
+        res = await s.execute(select(BtnOverride))
+        BTN_CACHE.clear()
+        for row in res.scalars():
+            BTN_CACHE[(row.lang, row.key)] = row.text
+
+def btn_text_cached(lang: str, key: str, default: str) -> str:
+    """Синхронный доступ к кэшу: если нет override — вернём default."""
+    return BTN_CACHE.get((lang, key), default)
+
+async def set_btn_text(lang: str, key: str, value: str) -> None:
+    async with get_session() as s:
+        res = await s.execute(
+            select(BtnOverride).where(BtnOverride.lang == lang, BtnOverride.key == key)
+        )
+        row = res.scalar_one_or_none()
+        if row:
+            row.text = value
+        else:
+            s.add(BtnOverride(lang=lang, key=key, text=value))
+        await s.commit()
+    BTN_CACHE[(lang, key)] = value
+
+async def del_btn_text(lang: str, key: str) -> None:
+    async with get_session() as s:
+        await s.execute(delete(BtnOverride).where(
+            BtnOverride.lang == lang, BtnOverride.key == key
+        ))
+        await s.commit()
+    BTN_CACHE.pop((lang, key), None)

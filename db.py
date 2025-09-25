@@ -4,6 +4,7 @@ from typing import Optional
 from sqlalchemy import BigInteger, Integer, String, Boolean, Float, select, func
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import UniqueConstraint
 
 from settings import settings
 
@@ -50,6 +51,17 @@ class ContentOverride(Base):
     screen: Mapped[str] = mapped_column(String(32), index=True)
     title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     text: Mapped[Optional[str]] = mapped_column(String(4096), nullable=True)
+
+class BtnOverride(Base):
+    __tablename__ = "btn_overrides"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lang: Mapped[str] = mapped_column(String(5), index=True)
+    key:  Mapped[str] = mapped_column(String(64), index=True)  # например: 'btn_register'
+    text: Mapped[str] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint("lang", "key", name="uix_btn_lang_key"),
+    )
 
 async def init_db() -> None:
     async with engine.begin() as conn:

@@ -25,7 +25,7 @@ from admin import router as admin_router
 from config_service import (
     pb_secret, channel_id,
     first_deposit_min, platinum_threshold,
-    check_subscription_enabled, check_registration_enabled, check_deposit_enabled
+    check_subscription_enabled, load_button_overrides, check_registration_enabled, check_deposit_enabled
 )
 
 ASSETS = Path(__file__).parent / "assets"
@@ -52,9 +52,14 @@ async def make_sig(kind: str, click_id: str) -> str:
 
 
 def photo_path(lang: Optional[str], key: str) -> Optional[Path]:
-    subdir = "ru" if (lang == "ru") else "en"
+    subdir = 'ru' if (lang == 'ru') else 'en'
+    # сначала ищем пользовательскую (assets_custom), потом дефолтную (assets)
+    p_custom = ASSETS.parent / 'assets_custom' / subdir / f"{key}.jpg"
+    if p_custom.exists():
+        return p_custom
     p = ASSETS / subdir / f"{key}.jpg"
     return p if p.exists() else None
+
 
 
 async def delete_previous(bot: Bot, chat_id: int, user: User) -> None:
@@ -335,6 +340,7 @@ async def cmd_whoami(m: Message):
 # ----------------- entry -----------------
 async def main() -> None:
     await init_db()
+    await load_button_overrides()
     dp = Dispatcher()
     dp.include_router(router)
     dp.include_router(admin_router)
