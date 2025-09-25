@@ -42,8 +42,8 @@ async def _links_text() -> str:
     sup = await support_url()
     return (
         "🔗 <b>Ссылки</b>\n\n"
-        f"Ref (REG_A):\n<code>{h(refreg or '')}</code>\n\n"
-        f"Deposit (DEP_A):\n<code>{h(refdep or '')}</code>\n\n"
+        f"Ref:\n<code>{h(refreg or '')}</code>\n\n"
+        f"Deposit:\n<code>{h(refdep or '')}</code>\n\n"
         f"Channel ID: <code>{h(str(ch_id) if ch_id is not None else '')}</code>\n"
         f"Channel URL: {h(ch_url or '-')}\n"
         f"Support URL: {h(sup or '-')}\n"
@@ -227,8 +227,8 @@ async def cb_links_edit(c: CallbackQuery, state: FSMContext):
     await state.update_data(edit_key=key)
 
     prompts = {
-        "REF_REG_A": "Введи новую реф-ссылку (REG_A):",
-        "REF_DEP_A": "Введи новую ссылку депозита (DEP_A):",
+        "REF_REG_A": "Введи новую реф-ссылку:",
+        "REF_DEP_A": "Введи новую ссылку депозита:",
         "CHANNEL_ID": "Введи новый Channel ID (число):",
         "CHANNEL_URL": "Введи новый Channel URL (http/https):",
         "SUPPORT_URL": "Введи новый Support URL:",
